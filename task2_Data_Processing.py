@@ -1,7 +1,7 @@
 # task2_clean_data.py
 # TrendPulse: Clean raw JSON into tidy CSV
 # Author: Shashank
-# Date: YYYY-MM-DD
+# Date: 05-04-2026
 
 import pandas as pd, json, os
 
