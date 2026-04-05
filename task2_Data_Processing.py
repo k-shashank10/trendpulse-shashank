@@ -1,57 +1,46 @@
-import json
-import pandas as pd
+# task2_clean_data.py
+# TrendPulse: Clean raw JSON into tidy CSV
+# Author: Shashank
+# Date: YYYY-MM-DD
 
-# --- Load JSON file ---
-with open("reliance_daily.json", "r") as f:
-    data = json.load(f)
+import pandas as pd, json, os
 
-# Extract time series data
-time_series = data.get("Time Series (Daily)", {})
-df_reliance = pd.DataFrame.from_dict(time_series, orient="index")
+# --- Step 1: Load JSON file ---
+fname = "/content/data/trends_20260405.json"   
+with open(fname) as f:
+    raw = json.load(f)
 
-# Rename columns for clarity
-df_reliance.columns = ["open", "high", "low", "close", "volume"]
+df = pd.DataFrame(raw)
+print(f"Loaded {len(df)} stories from {fname}")
 
-# Convert index to datetime
-df_reliance.index = pd.to_datetime(df_reliance.index)
+# --- Step 2: Clean the Data ---
 
-# Convert numeric columns to appropriate types
-df_reliance = df_reliance.astype({
-    "open": float,
-    "high": float,
-    "low": float,
-    "close": float,
-    "volume": int
-})
+# Remove duplicates by post_id
+df = df.drop_duplicates(subset="post_id")
+print("After removing duplicates:", len(df))
 
-# Sort by date
-df_reliance.sort_index(inplace=True)
+# Drop rows with missing post_id, title, or score
+df = df.dropna(subset=["post_id","title","score"])
+print("After removing nulls:", len(df))
 
-# --- Data Shape Before Cleaning ---
-print("Data shape before cleaning:", df_reliance.shape)
+# Ensure score and num_comments are integers
+df["score"] = df["score"].astype(int)
+df["num_comments"] = df["num_comments"].astype(int)
 
-# --- Data Cleaning ---
-# 1. Identify null values
-null_counts = df_reliance.isnull().sum()
+# Remove low quality (score < 5)
+df = df[df["score"] >= 5]
+print("After removing low scores:", len(df))
 
-# Extra check: if no nulls, print a clear message
-if null_counts.sum() == 0:
-    print(" No null values found in the dataset.")
-else:
-    print(" Null values detected, cleaning required.")
+# Strip whitespace from titles
+df["title"] = df["title"].str.strip()
 
-print("Null values per column:")
-print(null_counts)
+# --- Step 3: Save as CSV ---
+out = "data/trends_clean.csv"
+os.makedirs("data", exist_ok=True)
+df.to_csv(out, index=False)
 
+print(f"\nSaved {len(df)} rows to {out}\n")
 
-# 2. Drop rows with any null values
-df_reliance.dropna(inplace=True)
-
-# 3. Drop duplicate rows
-df_reliance.drop_duplicates(inplace=True)
-
-# 4. Confirm dataset shape after cleaning
-print("Data shape after cleaning:", df_reliance.shape)
-
-# 5. Preview cleaned data
-print(df_reliance.head())
+# Quick summary: stories per category
+print("Stories per category:")
+print(df["category"].value_counts())
