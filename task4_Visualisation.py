@@ -1,57 +1,43 @@
-import json
-import pandas as pd
+import json, pandas as pd, matplotlib.pyplot as plt
 
-# --- Load JSON file ---
-with open("reliance_daily.json", "r") as f:
+# Load JSON
+with open("reliance_daily.json") as f:
     data = json.load(f)
 
-# Extract time series data
-time_series = data.get("Time Series (Daily)", {})
-df_reliance = pd.DataFrame.from_dict(time_series, orient="index")
+# DataFrame
+ts = data.get("Time Series (Daily)", {})
+df = pd.DataFrame.from_dict(ts, orient="index")
+df.columns = ["open","high","low","close","vol"]
+df.index = pd.to_datetime(df.index)
+df = df.astype(float).sort_index()
 
-# Rename columns for clarity
-df_reliance.columns = ["open", "high", "low", "close", "volume"]
+# Indicators
+df["ret"] = df["close"].pct_change()
+df["ma20"] = df["close"].rolling(20).mean()
+df["ma50"] = df["close"].rolling(50).mean()
+df["vol20"] = df["ret"].rolling(20).std()
 
-# Convert index to datetime
-df_reliance.index = pd.to_datetime(df_reliance.index)
+delta = df["close"].diff()
+gain = delta.where(delta>0,0).rolling(14).mean()
+loss = (-delta.where(delta<0,0)).rolling(14).mean()
+df["rsi"] = 100 - (100/(1+gain/loss))
 
-# Convert numeric columns to appropriate types
-df_reliance = df_reliance.astype({
-    "open": float,
-    "high": float,
-    "low": float,
-    "close": float,
-    "volume": int
-})
+# --- Plots ---
+plt.figure(figsize=(12,8))
 
-# Sort by date
-df_reliance.sort_index(inplace=True)
+plt.subplot(3,1,1)
+plt.plot(df.index, df["close"], label="Close", c="blue")
+plt.plot(df.index, df["ma20"], label="MA20", c="orange")
+plt.plot(df.index, df["ma50"], label="MA50", c="green")
+plt.legend(); plt.title("Close + MA")
 
-# --- Data Shape Before Cleaning ---
-print("Data shape before cleaning:", df_reliance.shape)
+plt.subplot(3,1,2)
+plt.plot(df.index, df["vol20"], c="red")
+plt.title("Volatility (20d)")
 
-# --- Data Cleaning ---
-# 1. Identify null values
-null_counts = df_reliance.isnull().sum()
+plt.subplot(3,1,3)
+plt.plot(df.index, df["rsi"], c="purple")
+plt.axhline(70, ls="--", c="grey"); plt.axhline(30, ls="--", c="grey")
+plt.title("RSI (14d)")
 
-# Extra check: if no nulls, print a clear message
-if null_counts.sum() == 0:
-    print(" No null values found in the dataset.")
-else:
-    print(" Null values detected, cleaning required.")
-
-print("Null values per column:")
-print(null_counts)
-
-
-# 2. Drop rows with any null values
-df_reliance.dropna(inplace=True)
-
-# 3. Drop duplicate rows
-df_reliance.drop_duplicates(inplace=True)
-
-# 4. Confirm dataset shape after cleaning
-print("Data shape after cleaning:", df_reliance.shape)
-
-# 5. Preview cleaned data
-print(df_reliance.head())
+plt.tight_layout(); plt.show()
