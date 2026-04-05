@@ -1,5 +1,7 @@
 # task4_visualise.py
 # TrendPulse: Make charts from analysed data
+# Author: Shashank
+# Date: 05-04-2026 
 
 import pandas as pd
 import matplotlib.pyplot as plt
