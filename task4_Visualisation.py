@@ -1,43 +1,80 @@
-import json, pandas as pd, matplotlib.pyplot as plt
+# task4_visualise.py
+# TrendPulse: Make charts from analysed data
 
-# Load JSON
-with open("reliance_daily.json") as f:
-    data = json.load(f)
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
 
-# DataFrame
-ts = data.get("Time Series (Daily)", {})
-df = pd.DataFrame.from_dict(ts, orient="index")
-df.columns = ["open","high","low","close","vol"]
-df.index = pd.to_datetime(df.index)
-df = df.astype(float).sort_index()
+# Step 1: Setup
+# Load the CSV file from Task 3
+df = pd.read_csv("/content/data/trends_analysed.csv")
 
-# Indicators
-df["ret"] = df["close"].pct_change()
-df["ma20"] = df["close"].rolling(20).mean()
-df["ma50"] = df["close"].rolling(50).mean()
-df["vol20"] = df["ret"].rolling(20).std()
+# Make sure outputs/ folder exists
+os.makedirs("outputs", exist_ok=True)
 
-delta = df["close"].diff()
-gain = delta.where(delta>0,0).rolling(14).mean()
-loss = (-delta.where(delta<0,0)).rolling(14).mean()
-df["rsi"] = 100 - (100/(1+gain/loss))
+# Step 2: Chart 1 - Top 10 Stories by Score
+top10 = df.nlargest(10, "score")   # pick 10 highest scores
+# Shorten long titles
+titles = [t[:50] + "..." if len(t) > 50 else t for t in top10["title"]]
 
-# --- Plots ---
-plt.figure(figsize=(12,8))
+plt.figure(figsize=(10,6))
+plt.barh(titles, top10["score"], color="skyblue")
+plt.xlabel("Score")
+plt.ylabel("Story Title")
+plt.title("Top 10 Stories by Score")
+plt.tight_layout()
+plt.savefig("outputs/chart1_top_stories.png")
+plt.close()
 
-plt.subplot(3,1,1)
-plt.plot(df.index, df["close"], label="Close", c="blue")
-plt.plot(df.index, df["ma20"], label="MA20", c="orange")
-plt.plot(df.index, df["ma50"], label="MA50", c="green")
-plt.legend(); plt.title("Close + MA")
+# Step 3: Chart 2 - Stories per Category
+cat_counts = df["category"].value_counts()
 
-plt.subplot(3,1,2)
-plt.plot(df.index, df["vol20"], c="red")
-plt.title("Volatility (20d)")
+plt.figure(figsize=(8,6))
+plt.bar(cat_counts.index, cat_counts.values,
+        color=["blue","green","red","orange","purple"])
+plt.xlabel("Category")
+plt.ylabel("Number of Stories")
+plt.title("Stories per Category")
+plt.tight_layout()
+plt.savefig("outputs/chart2_categories.png")
+plt.close()
 
-plt.subplot(3,1,3)
-plt.plot(df.index, df["rsi"], c="purple")
-plt.axhline(70, ls="--", c="grey"); plt.axhline(30, ls="--", c="grey")
-plt.title("RSI (14d)")
+# Step 4: Chart 3 - Score vs Comments
+colors = df["is_popular"].map({True:"green", False:"red"})
 
-plt.tight_layout(); plt.show()
+plt.figure(figsize=(8,6))
+plt.scatter(df["score"], df["num_comments"], c=colors)
+plt.xlabel("Score")
+plt.ylabel("Number of Comments")
+plt.title("Score vs Comments")
+plt.legend(["Popular","Not Popular"])
+plt.tight_layout()
+plt.savefig("outputs/chart3_scatter.png")
+plt.close()
+
+# Bonus: Dashboard (all charts together)
+fig, axes = plt.subplots(1, 3, figsize=(18,6))
+
+# Chart 1
+axes[0].barh(titles, top10["score"], color="skyblue")
+axes[0].set_title("Top 10 by Score")
+
+# Chart 2
+axes[1].bar(cat_counts.index, cat_counts.values,
+            color=["blue","green","red","orange","purple"])
+axes[1].set_title("Stories per Category")
+
+# Chart 3
+axes[2].scatter(df["score"], df["num_comments"], c=colors)
+axes[2].set_title("Score vs Comments")
+
+fig.suptitle("TrendPulse Dashboard", fontsize=16)
+plt.tight_layout()
+plt.savefig("outputs/dashboard.png")
+plt.close()
+
+print("Charts saved in outputs/ folder:")
+print(" - chart1_top_stories.png")
+print(" - chart2_categories.png")
+print(" - chart3_scatter.png")
+print(" - dashboard.png")
