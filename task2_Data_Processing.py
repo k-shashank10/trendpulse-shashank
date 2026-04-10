@@ -6,7 +6,7 @@
 import pandas as pd, json, os
 
 # --- Step 1: Load JSON file ---
-fname = "/content/data/trends_20260405.json"   
+fname = "/content/data/trends_20260410.json"   
 with open(fname) as f:
     raw = json.load(f)
 
