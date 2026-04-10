@@ -30,35 +30,48 @@ def get_category(title):
 
 # --- Step 1: Fetch top story IDs ---
 try:
-    ids = requests.get(TOP_STORIES_URL, headers=HEADERS).json()[:500]
+    ids = requests.get(TOP_STORIES_URL, headers=HEADERS, timeout=10).json()[:500]
 except Exception as e:
     print("Error fetching top stories:", e)
     ids = []
 
-# --- Step 2: Fetch story details ---
+# --- Step 2: Keep fetching until minimum stories are collected ---
 stories = []
-for cat in CATEGORIES:
-    count = 0
-    for sid in ids:
-        if count >= 25: break
-        try:
-            story = requests.get(ITEM_URL.format(sid), headers=HEADERS).json()
-            if not story or "title" not in story: continue
-            category = get_category(story["title"])
-            if category == cat:
-                stories.append({
-                    "post_id": story.get("id"),
-                    "title": story.get("title"),
-                    "category": category,
-                    "score": story.get("score",0),
-                    "num_comments": story.get("descendants",0),
-                    "author": story.get("by"),
-                    "collected_at": datetime.now().isoformat()
-                })
-                count += 1
-        except Exception as e:
-            print(f"Failed to fetch story {sid}: {e}")
-    time.sleep(2)  # wait per category
+total_collected = 0
+MIN_STORIES = 120
+
+while total_collected < MIN_STORIES and ids:
+    for cat in CATEGORIES:
+        count = 0
+        for sid in ids:
+            if count >= 25: break
+            if total_collected >= MIN_STORIES: break
+            try:
+                response = requests.get(ITEM_URL.format(sid), headers=HEADERS, timeout=10)
+                story = response.json()
+                if not story or "title" not in story:
+                    continue
+                category = get_category(story["title"])
+                if category == cat:
+                    stories.append({
+                        "post_id": story.get("id"),
+                        "title": story.get("title"),
+                        "category": category,
+                        "score": story.get("score",0),
+                        "num_comments": story.get("descendants",0),
+                        "author": story.get("by"),
+                        "collected_at": datetime.now().isoformat()
+                    })
+                    count += 1
+                    total_collected += 1
+            except Exception as e:
+                print(f"Failed to fetch story {sid}: {e}")
+        time.sleep(2)  # wait per category
+
+    # If still not enough, wait and retry
+    if total_collected < MIN_STORIES:
+        print(f"Collected {total_collected} so far, retrying to reach {MIN_STORIES}...")
+        time.sleep(5)
 
 # --- Step 3: Save to JSON file ---
 os.makedirs("data", exist_ok=True)
@@ -66,4 +79,4 @@ fname = f"data/trends_{datetime.now().strftime('%Y%m%d')}.json"
 with open(fname, "w") as f:
     json.dump(stories, f, indent=2)
 
-print(f"Collected {len(stories)} stories. Saved to {fname}")
+print(f"Collected {len(stories)} stories (minimum {MIN_STORIES}). Saved to {fname}")
